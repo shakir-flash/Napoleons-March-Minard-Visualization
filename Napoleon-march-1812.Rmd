@@ -1,0 +1,151 @@
+---
+title: "Data Visualization - Napoleon's March in 1812"
+author: "Shakir Ahmed"
+date: 2023-09-13 (YYYY-MM-DD)
+---
+
+## Setup
+
+Initialization of packages, and downloading additional packages needed for this homework assignment.
+
+Theme set has also been set to the perfect standard.
+
+```{r include=FALSE}
+#Installing required packages for the homework
+install.packages("pacman")
+install.packages("tidyverse")
+install.packages("dplyr")
+install.packages("ggplot2")
+pacman::p_load("tidyverse")
+
+
+# set theme for ggplot2
+ggplot2::theme_set(ggplot2::theme_minimal(base_size = 14))
+
+# set width of code output
+options(width = 65)
+
+# set figure parameters for knitr
+knitr::opts_chunk$set(
+  fig.width = 7,        # 7" width
+  fig.asp = 0.618,      # the golden ratio
+  fig.retina = 3,       # dpi multiplier for displaying HTML output on retina
+  fig.align = "center", # center align figures
+  dpi = 300             # higher dpi, sharper image
+)
+
+```
+
+## Napoleon's march in 1812
+
+This exercise i to recreate the Napoleon's march plot by Charles John Minard in ggplot2. The data is provided in package 'HistData', and this is the package from where we will be importing the data.
+
+-   Importing/reading the code using the rds() function after setting file path to 'data' folder
+
+```{r import,warning = FALSE, message=FALSE,include=FALSE}
+
+    library(ggplot2)
+    library(scales)     # additional formatting for scales
+    library(grid)       # combining plots
+    library(gridExtra)  # combining plots
+    library(dplyr)      # tidy data manipulations
+    install.packages("HistData")
+```
+
+Now, we can recreate the plot of Napoleon's march in 1812. Parameters included are Latitude, Longitude, troop strength (size) and temperature.
+
+```{r Napoleon_march,warning = FALSE, message=FALSE}
+
+  
+    #Troop data
+    data(Minard.troops, package="HistData")
+    str(Minard.troops)
+    #Cities Data
+    data(Minard.cities, package="HistData")
+    str(Minard.cities)
+    #Temperature data
+    data(Minard.temp, package="HistData")
+    str(Minard.temp)
+
+    #Below plot is for plotting the latitude and longitude the troops travelled
+    #Width is set as the number of survivors to show the strength of the army
+    #Knitr function is used to scale the graph
+     breaks <- c(1, 2, 3) * 10^5 #New vector setis defined
+    ggplot(Minard.troops, aes(long, lat)) +
+            geom_path(aes(size = survivors, colour = direction, group = group),
+                      lineend="round") +
+        scale_size("Survivors", range = c(1,10), #c(0.5, 15),
+                   breaks=breaks, labels=scales::comma(breaks)) +
+        scale_color_manual("Direction", 
+                           values = c("cornsilk3", "black"), 
+                           labels=c("Advance", "Retreat")) 
+
+    #ggplot trick to assign it to a variable to use later
+    plot_troops <- last_plot()
+
+
+    #Cities are now appended on top of the above plot
+    plot_troops + geom_text(data = Minard.cities, aes(label = city), size = 3)
+
+    #Package ggrepel is used to automatically move the labels away from points and to ensure none of the labels overlap
+    if (!require(ggrepel)) {install.packages("ggrepel"); require(ggrepel)}
+    library(ggrepel)
+    plot_troops +   
+        geom_point(data = Minard.cities) +
+        geom_text_repel(data = Minard.cities, aes(label = city))
+
+    #ggplot trick to assign it to a variable to use later
+    plot_troops_cities <- last_plot()
+
+    #Plotting the temperature with custom size
+    ggplot(Minard.temp, aes(long, temp)) +
+        geom_path(color="grey", size=1.5) +
+        geom_point(size=2)
+
+    #Below code is to standardize the temperature format by combining temperature and date
+    Minard.temp <- Minard.temp %>%
+        mutate(label = paste0(temp, "° ", date))
+    head(Minard.temp$label)
+
+    #These plots are pushing the right most two points outside the graph. Using geom_text_repel to bring back the data
+    ggplot(Minard.temp, aes(long, temp)) +
+        geom_path(color="grey", size=1.5) +
+        geom_point(size=1) +
+      geom_text_repel(aes(label=label), size=2.5)
+
+    #ggplot trick to assign it to a variable to use later
+    plot_temp <- last_plot()
+
+
+    #Now, we have to assemble the two graphs one below the other
+    grid.arrange(plot_troops_cities, plot_temp)
+
+    #In troops and cities plot, we have to set X axis limits to a range that will coincide with those for the plot of temperature
+    #Remove X and Y axis labels scales
+    #Remove legends for survivors and directions
+    plot_troops_cities +
+      coord_cartesian(xlim = c(24, 38)) +
+      labs(x = "Longitude", y = "Latitude",title="Minard's version of Napoleon's March") +
+      guides(color = FALSE, size = FALSE)
+
+    #ggplot trick to assign it to a variable to use later
+    plot_troops_cities_fixed <- last_plot() 
+
+    #Setting theme for temperature graph
+    plot_temp + 
+      coord_cartesian(xlim = c(24, 38)) +
+      labs(x="Napoleon's March Duration", y="Temperature",caption = "Michael Friendly (2018), Minard meets ggplot2") + 
+      theme_bw() +
+      theme(panel.grid.major.x = element_blank(),
+            panel.grid.minor.x = element_blank(),
+            panel.grid.minor.y = element_blank(),
+            axis.text.x = element_blank(), axis.ticks = element_blank(),
+            panel.border = element_blank())
+
+    #ggplot trick to assign it to a variable to use later
+    plot_temp_fixed <- last_plot()
+
+    #Function to combine both the plots into one single plot and add a border
+    grid.arrange(plot_troops_cities_fixed, plot_temp_fixed, nrow=2, heights=c(3.5, 1.2))
+    grid.rect(width = .99, height = .99, gp = gpar(lwd = 2, col = "gray", fill = NA))
+```
